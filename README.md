@@ -23,13 +23,18 @@ A potência é estimada considerando uma tensão residencial de **127 V**:
 potência (W) = corrente (A) × 127 V
 ```
 
-O relé é controlado pelo **GPIO 26** e opera com lógica ativa em nível baixo:
+O relé é controlado pelo **GPIO 26** e opera com lógica ativa em nível baixo.
+Para evitar comutações causadas por oscilações próximas ao limite, o controle
+utiliza histerese e temporização:
 
-- Potência acima de **1001 W**: GPIO 26 em nível alto, desligando o relé.
-- Potência igual ou inferior a **1001 W**: GPIO 26 em nível baixo, acionando o relé.
+- Potência acima de **1050 W** durante 5 segundos: desliga o relé.
+- Potência abaixo de **900 W** durante 5 segundos: aciona o relé.
+- Potência entre **900 W e 1050 W**: mantém o estado atual.
+- Depois de uma mudança, aguarda pelo menos 30 segundos antes de permitir outra.
 
 Ao iniciar, o programa coloca o GPIO 26 em nível alto para manter o relé
-desligado.
+desligado. A primeira comutação exige os 5 segundos de confirmação, mas não
+precisa aguardar o intervalo de 30 segundos.
 
 ## Exibição e atualização
 

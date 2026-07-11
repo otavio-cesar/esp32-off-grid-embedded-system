@@ -27,6 +27,16 @@ int ct = 0;
 const float atenuacao = 3.3;
 #define RELE1 26
 
+const float potenciaDesligar = 1050.0;
+const float potenciaLigar = 900.0;
+const unsigned long tempoConfirmacaoRele = 5000UL;
+const unsigned long tempoMinimoEntreComutacoes = 30000UL;
+
+bool releLigado = false;
+bool releJaComutou = false;
+unsigned long inicioCondicaoRele = 0;
+unsigned long ultimaComutacaoRele = 0;
+
 
 void setup() {
   pinMode(RELE1, OUTPUT);
@@ -64,18 +74,54 @@ void loop() {
     potencia = 0;
   }
   displayLED(tensao, corrente, potencia);
-  
-  if (potencia > 1001)
-  {
-    digitalWrite(RELE1, HIGH);   // desliga relé 1
-  }
-  else
-  {
-    digitalWrite(RELE1, LOW);   // liga relé 1
-  }
+
+  controlarRele(potencia);
   Serial.println("Enviando dados pela serial...");
 
   delay(500);
+}
+
+void controlarRele(float potencia) {
+  unsigned long agora = millis();
+  bool novoEstado;
+
+  // Histerese: dentro da faixa entre os limites, mantém o estado atual.
+  if (releLigado && potencia > potenciaDesligar) {
+    novoEstado = false;
+  }
+  else if (!releLigado && potencia < potenciaLigar) {
+    novoEstado = true;
+  }
+  else {
+    inicioCondicaoRele = 0;
+    return;
+  }
+
+  // Protege o contator contra duas comutações muito próximas.
+  if (releJaComutou &&
+      agora - ultimaComutacaoRele < tempoMinimoEntreComutacoes) {
+    inicioCondicaoRele = 0;
+    return;
+  }
+
+  // A condição precisa permanecer válida antes de alterar o relé.
+  if (inicioCondicaoRele == 0) {
+    inicioCondicaoRele = agora;
+    return;
+  }
+
+  if (agora - inicioCondicaoRele < tempoConfirmacaoRele) {
+    return;
+  }
+
+  releLigado = novoEstado;
+  digitalWrite(RELE1, releLigado ? LOW : HIGH);
+
+  ultimaComutacaoRele = agora;
+  releJaComutou = true;
+  inicioCondicaoRele = 0;
+
+  Serial.println(releLigado ? "Relé acionado." : "Relé desativado.");
 }
 
 void displayLED(float t,float t2, float t3) {
