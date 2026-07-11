@@ -1,6 +1,6 @@
-#include <DHT.h>
-#define DHT11_PIN  4 // ESP32 pin GPIO21 connected to DHT11 sensor
-DHT dht11(DHT11_PIN, DHT11);
+// #include <DHT.h>
+// #define DHT11_PIN  4 // ESP32 pin GPIO21 connected to DHT11 sensor
+// DHT dht11(DHT11_PIN, DHT11);
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -29,13 +29,18 @@ const float atenuacao = 3.3;
 
 const float potenciaDesligar = 1050.0;
 const float potenciaLigar = 900.0;
-const unsigned long tempoConfirmacaoRele = 5000UL;
-const unsigned long tempoMinimoEntreComutacoes = 30000UL;
+const float potenciaPico = 1500.0;
+const unsigned long tempoConfirmacaoDesligamento = 5000UL;
+const unsigned long tempoConfirmacaoPico = 3000UL;
+const unsigned long tempoConfirmacaoLigamento = 5000UL;
+const unsigned long tempoMinimoDesligado = 30000UL;
 
 bool releLigado = false;
-bool releJaComutou = false;
-unsigned long inicioCondicaoRele = 0;
-unsigned long ultimaComutacaoRele = 0;
+bool releFoiDesligado = false;
+unsigned long inicioSobrecarga = 0;
+unsigned long inicioPico = 0;
+unsigned long inicioCondicaoLigar = 0;
+unsigned long momentoDesligamentoRele = 0;
 
 
 void setup() {
@@ -83,45 +88,83 @@ void loop() {
 
 void controlarRele(float potencia) {
   unsigned long agora = millis();
-  bool novoEstado;
 
-  // Histerese: dentro da faixa entre os limites, mantém o estado atual.
-  if (releLigado && potencia > potenciaDesligar) {
-    novoEstado = false;
-  }
-  else if (!releLigado && potencia < potenciaLigar) {
-    novoEstado = true;
-  }
-  else {
-    inicioCondicaoRele = 0;
+  if (releLigado) {
+    bool deveDesligar = false;
+    inicioCondicaoLigar = 0;
+
+    // Sobrecarga contínua: desliga após 5 segundos acima de 1050 W.
+    if (potencia > potenciaDesligar) {
+      if (inicioSobrecarga == 0) {
+        inicioSobrecarga = agora;
+      }
+      else if (agora - inicioSobrecarga >= tempoConfirmacaoDesligamento) {
+        deveDesligar = true;
+      }
+    }
+    else {
+      inicioSobrecarga = 0;
+    }
+
+    // Pico crítico: desliga após 3 segundos acima de 1500 W.
+    if (potencia > potenciaPico) {
+      if (inicioPico == 0) {
+        inicioPico = agora;
+      }
+      else if (agora - inicioPico >= tempoConfirmacaoPico) {
+        deveDesligar = true;
+      }
+    }
+    else {
+      inicioPico = 0;
+    }
+
+    // O bloqueio de 30 segundos nunca atrasa um desligamento.
+    if (deveDesligar) {
+      releLigado = false;
+      digitalWrite(RELE1, HIGH);
+
+      momentoDesligamentoRele = agora;
+      releFoiDesligado = true;
+      inicioSobrecarga = 0;
+      inicioPico = 0;
+
+      Serial.println("Relé desativado por sobrecarga.");
+    }
+
     return;
   }
 
-  // Protege o contator contra duas comutações muito próximas.
-  if (releJaComutou &&
-      agora - ultimaComutacaoRele < tempoMinimoEntreComutacoes) {
-    inicioCondicaoRele = 0;
+  inicioSobrecarga = 0;
+  inicioPico = 0;
+
+  // Após um desligamento, mantém o relé desativado por pelo menos 30 segundos.
+  if (releFoiDesligado &&
+      agora - momentoDesligamentoRele < tempoMinimoDesligado) {
+    inicioCondicaoLigar = 0;
     return;
   }
 
-  // A condição precisa permanecer válida antes de alterar o relé.
-  if (inicioCondicaoRele == 0) {
-    inicioCondicaoRele = agora;
+  // Religa somente se a potência permanecer abaixo de 900 W por 5 segundos.
+  if (potencia >= potenciaLigar) {
+    inicioCondicaoLigar = 0;
     return;
   }
 
-  if (agora - inicioCondicaoRele < tempoConfirmacaoRele) {
+  if (inicioCondicaoLigar == 0) {
+    inicioCondicaoLigar = agora;
     return;
   }
 
-  releLigado = novoEstado;
-  digitalWrite(RELE1, releLigado ? LOW : HIGH);
+  if (agora - inicioCondicaoLigar < tempoConfirmacaoLigamento) {
+    return;
+  }
 
-  ultimaComutacaoRele = agora;
-  releJaComutou = true;
-  inicioCondicaoRele = 0;
+  releLigado = true;
+  digitalWrite(RELE1, LOW);
+  inicioCondicaoLigar = 0;
 
-  Serial.println(releLigado ? "Relé acionado." : "Relé desativado.");
+  Serial.println("Relé acionado.");
 }
 
 void displayLED(float t,float t2, float t3) {

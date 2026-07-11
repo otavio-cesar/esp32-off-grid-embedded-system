@@ -28,9 +28,12 @@ Para evitar comutações causadas por oscilações próximas ao limite, o contro
 utiliza histerese e temporização:
 
 - Potência acima de **1050 W** durante 5 segundos: desliga o relé.
+- Potência acima de **1500 W** durante 3 segundos: desliga o relé.
 - Potência abaixo de **900 W** durante 5 segundos: aciona o relé.
 - Potência entre **900 W e 1050 W**: mantém o estado atual.
-- Depois de uma mudança, aguarda pelo menos 30 segundos antes de permitir outra.
+- Depois de desligar, mantém o relé desativado por pelo menos 30 segundos.
+- O intervalo de 30 segundos não bloqueia nem atrasa um desligamento por
+  sobrecarga; ele protege somente o religamento.
 
 Ao iniciar, o programa coloca o GPIO 26 em nível alto para manter o relé
 desligado. A primeira comutação exige os 5 segundos de confirmação, mas não
