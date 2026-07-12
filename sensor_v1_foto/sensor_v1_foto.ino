@@ -179,14 +179,17 @@ void controlarRele(float potencia) {
   Serial.println("Relé acionado.");
 }
 
-void displayLED(float t,float t2, float t3) {
+void displayLED(float tensao, float corrente, float potencia) {
   display.clearDisplay();
   display.setTextSize(2); 
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(10, 0);
-  display.println(String(t));
-  display.println(String(t2));
-  display.println(String(t3));
+  display.print(tensao);
+  display.println(" V");
+  display.print(corrente);
+  display.println(" A");
+  display.print(potencia);
+  display.println(" W");
   display.display();      
   delay(100);
 }
