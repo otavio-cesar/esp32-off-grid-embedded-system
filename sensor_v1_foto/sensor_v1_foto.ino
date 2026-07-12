@@ -20,7 +20,7 @@ const int sctval = 10;
 const int tensaoResidencia = 127;
 const float aFx = 13.6436;
 const float bFx = 4.4319;
-const float deadZone = 5.9; // Menos que isso ainda não é possível ler.
+const float deadZone = 5.9; // Menos que isso ainda nÃ£o Ã© possÃ­vel ler.
 int ct = 0;
 // Caso use ADC_11db entao 3.3
 // Caso use ADC_0db entao 0.9
@@ -45,13 +45,13 @@ unsigned long momentoDesligamentoRele = 0;
 
 void setup() {
   pinMode(RELE1, OUTPUT);
-  // Desliga os relés ao iniciar
+  // Desliga os relÃ©s ao iniciar
   digitalWrite(RELE1, HIGH);
 
   Serial.begin(115200);
   analogReadResolution(12); // 0-4095
-  //analogSetAttenuation(ADC_11db); // permite medir até ~3.3V
-  analogSetAttenuation(ADC_6db); // permite medir até ~1.9V
+  //analogSetAttenuation(ADC_11db); // permite medir atÃ© ~3.3V
+  analogSetAttenuation(ADC_6db); // permite medir atÃ© ~1.9V
   Serial.begin(9600);
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
@@ -93,7 +93,7 @@ void controlarRele(float potencia) {
     bool deveDesligar = false;
     inicioCondicaoLigar = 0;
 
-    // Sobrecarga contínua: desliga após 5 segundos acima de 1050 W.
+    // Sobrecarga contÃ­nua: desliga apÃ³s 5 segundos acima de 1050 W.
     if (potencia > potenciaDesligar) {
       if (inicioSobrecarga == 0) {
         inicioSobrecarga = agora;
@@ -106,7 +106,7 @@ void controlarRele(float potencia) {
       inicioSobrecarga = 0;
     }
 
-    // Pico crítico: desliga após 3 segundos acima de 1500 W.
+    // Pico crÃ­tico: desliga apÃ³s 3 segundos acima de 1500 W.
     if (potencia > potenciaPico) {
       if (inicioPico == 0) {
         inicioPico = agora;
@@ -129,7 +129,7 @@ void controlarRele(float potencia) {
       inicioSobrecarga = 0;
       inicioPico = 0;
 
-      Serial.println("Relé desativado por sobrecarga.");
+      Serial.println("RelÃ© desativado por sobrecarga.");
     }
 
     return;
@@ -138,14 +138,14 @@ void controlarRele(float potencia) {
   inicioSobrecarga = 0;
   inicioPico = 0;
 
-  // Após um desligamento, mantém o relé desativado por pelo menos 30 segundos.
+  // Apï¿½s um desligamento, mantÃ©m o relÃ© desativado por pelo menos 30 segundos.
   if (releFoiDesligado &&
       agora - momentoDesligamentoRele < tempoMinimoDesligado) {
     inicioCondicaoLigar = 0;
     return;
   }
 
-  // Religa somente se a potência permanecer abaixo de 900 W por 5 segundos.
+  // Religa somente se a potÃªncia permanecer abaixo de 900 W por 5 segundos.
   if (potencia >= potenciaLigar) {
     inicioCondicaoLigar = 0;
     return;
@@ -164,7 +164,7 @@ void controlarRele(float potencia) {
   digitalWrite(RELE1, LOW);
   inicioCondicaoLigar = 0;
 
-  Serial.println("Relé acionado.");
+  Serial.println("RelÃ© acionado.");
 }
 
 void displayLED(float t,float t2, float t3) {
