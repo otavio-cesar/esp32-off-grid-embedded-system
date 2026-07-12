@@ -27,16 +27,18 @@ int ct = 0;
 const float atenuacao = 3.3;
 #define RELE1 26
 
-const float potenciaDesligar = 1050.0;
+const float potenciaDesligar = 1000.0;
 const float potenciaLigar = 900.0;
-const float potenciaPico = 1500.0;
+const float potenciaPico = 1200.0;
 const unsigned long tempoConfirmacaoDesligamento = 5000UL;
-const unsigned long tempoConfirmacaoPico = 3000UL;
+const unsigned long tempoConfirmacaoPico = 2000UL;
 const unsigned long tempoConfirmacaoLigamento = 5000UL;
 const unsigned long tempoMinimoDesligado = 30000UL;
+const unsigned long tempoEsperaInicial = 60000UL;
 
 bool releLigado = false;
 bool releFoiDesligado = false;
+bool esperaInicialConcluida = false;
 unsigned long inicioSobrecarga = 0;
 unsigned long inicioPico = 0;
 unsigned long inicioCondicaoLigar = 0;
@@ -93,7 +95,7 @@ void controlarRele(float potencia) {
     bool deveDesligar = false;
     inicioCondicaoLigar = 0;
 
-    // Sobrecarga contínua: desliga após 5 segundos acima de 1050 W.
+    // Sobrecarga contínua: desliga após 5 segundos acima de 1000 W.
     if (potencia > potenciaDesligar) {
       if (inicioSobrecarga == 0) {
         inicioSobrecarga = agora;
@@ -106,7 +108,7 @@ void controlarRele(float potencia) {
       inicioSobrecarga = 0;
     }
 
-    // Pico crítico: desliga após 3 segundos acima de 1500 W.
+    // Pico crítico: desliga após 2 segundos acima de 1200 W.
     if (potencia > potenciaPico) {
       if (inicioPico == 0) {
         inicioPico = agora;
@@ -137,6 +139,16 @@ void controlarRele(float potencia) {
 
   inicioSobrecarga = 0;
   inicioPico = 0;
+
+  // Mantém o relé desligado durante os primeiros 60 segundos após a inicialização.
+  if (!esperaInicialConcluida) {
+    if (agora < tempoEsperaInicial) {
+      inicioCondicaoLigar = 0;
+      return;
+    }
+
+    esperaInicialConcluida = true;
+  }
 
   // Ap�s um desligamento, mantém o relé desativado por pelo menos 30 segundos.
   if (releFoiDesligado &&
