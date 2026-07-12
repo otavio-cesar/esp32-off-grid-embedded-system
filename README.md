@@ -27,17 +27,25 @@ O relé é controlado pelo **GPIO 26** e opera com lógica ativa em nível baixo
 Para evitar comutações causadas por oscilações próximas ao limite, o controle
 utiliza histerese e temporização:
 
-- Potência acima de **1050 W** durante 5 segundos: desliga o relé.
-- Potência acima de **1500 W** durante 3 segundos: desliga o relé.
+- Potência acima de **1000 W** durante 5 segundos: desliga o relé.
+- Potência acima de **1200 W** durante 2 segundos: desliga o relé.
 - Potência abaixo de **900 W** durante 5 segundos: aciona o relé.
-- Potência entre **900 W e 1050 W**: mantém o estado atual.
+- Potência entre **900 W e 1000 W**: mantém o estado atual.
 - Depois de desligar, mantém o relé desativado por pelo menos 30 segundos.
 - O intervalo de 30 segundos não bloqueia nem atrasa um desligamento por
   sobrecarga; ele protege somente o religamento.
 
 Ao iniciar, o programa coloca o GPIO 26 em nível alto para manter o relé
-desligado. A primeira comutação exige os 5 segundos de confirmação, mas não
-precisa aguardar o intervalo de 30 segundos.
+desligado. O contator é normalmente fechado para a concessionária; portanto,
+a carga permanece alimentada pela rede enquanto o ESP32 inicializa ou enquanto
+o relé está desenergizado.
+
+O acionamento do relé fica bloqueado durante os primeiros **60 segundos** após a
+inicialização. Encerrado esse período, a potência ainda precisa permanecer
+abaixo de **900 W** durante 5 segundos. Assim, o primeiro acionamento pode
+ocorrer aproximadamente 65 segundos após a inicialização. Esse bloqueio inicial
+é independente do intervalo de 30 segundos aplicado depois de um desligamento
+por sobrecarga.
 
 ## Exibição e atualização
 
@@ -65,5 +73,5 @@ programa também envia uma mensagem de atividade pela porta serial.
 - Wire
 - SPI
 
-O código também inclui a biblioteca DHT e configura o GPIO 4, mas atualmente
-não realiza leituras de temperatura ou umidade.
+O arquivo contém apenas trechos comentados relacionados ao sensor DHT e ao
+GPIO 4. A biblioteca e o sensor não são utilizados na versão atual.
