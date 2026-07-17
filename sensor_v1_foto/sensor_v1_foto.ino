@@ -26,7 +26,6 @@ const int tensaoResidencia = 120;
 // A tensao usada aqui e o RMS da componente AC, depois da remocao do offset.
 const float aFx = 35.5249;
 const float bFx = 0.0848;
-const float deadZone = 5.9; // Menos que isso ainda não é possível ler.
 int ct = 0;
 // Caso use ADC_11db entao 3.3
 // Caso use ADC_0db entao 0.9
@@ -76,11 +75,6 @@ void loop() {
   float tensao = medirTensaoRms();
   float corrente = tensao * aFx + bFx;
   float potencia = corrente * tensaoResidencia;
-  if (corrente < deadZone)
-  {
-    corrente = 0;
-    potencia = 0;
-  }
   displayLED(tensao, corrente, potencia);
 
   controlarRele(potencia);

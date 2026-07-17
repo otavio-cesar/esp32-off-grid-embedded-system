@@ -22,9 +22,6 @@ Esse ajuste foi obtido por regressão linear dos dados simulados do novo
 condicionador, depois de retirar em quadratura o offset de 1,5 V da tensão RMS
 total. O coeficiente de determinação do ajuste é aproximadamente `R² = 0,9996`.
 
-Valores de corrente inferiores a **5,9 A** são considerados parte da zona morta
-da medição e, nesse caso, a corrente e a potência são definidas como zero.
-
 A potência é estimada considerando uma tensão residencial de **127 V**:
 
 ```text
