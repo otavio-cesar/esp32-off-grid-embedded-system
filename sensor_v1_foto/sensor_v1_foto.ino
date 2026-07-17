@@ -31,11 +31,12 @@ int ct = 0;
 // Caso use ADC_0db entao 0.9
 const float atenuacao = 3.3;
 #define RELE1 26
+#define BUZZER 27
 
-const float potenciaDesligar = 1000.0;
-const float potenciaLigar = 900.0;
-const float potenciaPico = 1200.0;
-const unsigned long tempoConfirmacaoDesligamento = 5000UL;
+const float potenciaLigar = 1000.0;
+const float potenciaSobrecarga = 1200.0;
+const float potenciaPico = 1450.0;
+const unsigned long tempoConfirmacaoSobrecarga = 10000UL;
 const unsigned long tempoConfirmacaoPico = 2000UL;
 const unsigned long tempoConfirmacaoLigamento = 5000UL;
 const unsigned long tempoMinimoDesligado = 30000UL;
@@ -52,8 +53,10 @@ unsigned long momentoDesligamentoRele = 0;
 
 void setup() {
   pinMode(RELE1, OUTPUT);
+  pinMode(BUZZER, OUTPUT);
   // Desliga os relés ao iniciar
   digitalWrite(RELE1, HIGH);
+  digitalWrite(BUZZER, LOW);
 
   Serial.begin(115200);
   analogReadResolution(12); // 0-4095
@@ -117,12 +120,12 @@ void controlarRele(float potencia) {
     bool deveDesligar = false;
     inicioCondicaoLigar = 0;
 
-    // Sobrecarga contínua: desliga após 5 segundos acima de 1000 W.
-    if (potencia > potenciaDesligar) {
+    // Sobrecarga: desliga apos 10 segundos entre 1200 W e 1450 W.
+    if (potencia >= potenciaSobrecarga && potencia <= potenciaPico) {
       if (inicioSobrecarga == 0) {
         inicioSobrecarga = agora;
       }
-      else if (agora - inicioSobrecarga >= tempoConfirmacaoDesligamento) {
+      else if (agora - inicioSobrecarga >= tempoConfirmacaoSobrecarga) {
         deveDesligar = true;
       }
     }
@@ -130,7 +133,7 @@ void controlarRele(float potencia) {
       inicioSobrecarga = 0;
     }
 
-    // Pico crítico: desliga após 2 segundos acima de 1200 W.
+    // Pico critico: desliga apos 2 segundos acima de 1450 W.
     if (potencia > potenciaPico) {
       if (inicioPico == 0) {
         inicioPico = agora;
@@ -147,6 +150,7 @@ void controlarRele(float potencia) {
     if (deveDesligar) {
       releLigado = false;
       digitalWrite(RELE1, HIGH);
+      digitalWrite(BUZZER, HIGH);
 
       momentoDesligamentoRele = agora;
       releFoiDesligado = true;
@@ -179,7 +183,7 @@ void controlarRele(float potencia) {
     return;
   }
 
-  // Religa somente se a potência permanecer abaixo de 900 W por 5 segundos.
+  // Religa somente se a potencia permanecer abaixo de 1000 W por 5 segundos.
   if (potencia >= potenciaLigar) {
     inicioCondicaoLigar = 0;
     return;
@@ -196,6 +200,7 @@ void controlarRele(float potencia) {
 
   releLigado = true;
   digitalWrite(RELE1, LOW);
+  digitalWrite(BUZZER, LOW);
   inicioCondicaoLigar = 0;
 
   Serial.println("Relé acionado.");

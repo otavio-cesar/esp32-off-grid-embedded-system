@@ -22,20 +22,23 @@ Esse ajuste foi obtido por regressão linear dos dados simulados do novo
 condicionador, depois de retirar em quadratura o offset de 1,5 V da tensão RMS
 total. O coeficiente de determinação do ajuste é aproximadamente `R² = 0,9996`.
 
-A potência é estimada considerando uma tensão residencial de **127 V**:
+A potência é estimada considerando uma tensão residencial de **120 V**:
 
 ```text
-potência (W) = corrente (A) × 127 V
+potência (W) = corrente (A) × 120 V
 ```
 
 O relé é controlado pelo **GPIO 26** e opera com lógica ativa em nível baixo.
 Para evitar comutações causadas por oscilações próximas ao limite, o controle
 utiliza histerese e temporização:
 
-- Potência acima de **1000 W** durante 5 segundos: desliga o relé.
-- Potência acima de **1200 W** durante 2 segundos: desliga o relé.
-- Potência abaixo de **900 W** durante 5 segundos: aciona o relé.
-- Potência entre **900 W e 1000 W**: mantém o estado atual.
+- Potência entre **1200 W e 1450 W** durante 10 segundos: desliga o relé
+  e aciona o buzzer.
+- Potência acima de **1450 W** durante 2 segundos: desliga o relé e aciona
+  o buzzer.
+- Potência abaixo de **1000 W** durante 5 segundos: aciona o relé e desliga
+  o buzzer.
+- Potência entre **1000 W e 1200 W**: mantém o estado atual.
 - Depois de desligar, mantém o relé desativado por pelo menos 30 segundos.
 - O intervalo de 30 segundos não bloqueia nem atrasa um desligamento por
   sobrecarga; ele protege somente o religamento.
@@ -47,7 +50,7 @@ o relé está desenergizado.
 
 O acionamento do relé fica bloqueado durante os primeiros **60 segundos** após a
 inicialização. Encerrado esse período, a potência ainda precisa permanecer
-abaixo de **900 W** durante 5 segundos. Assim, o primeiro acionamento pode
+abaixo de **1000 W** durante 5 segundos. Assim, o primeiro acionamento pode
 ocorrer aproximadamente 65 segundos após a inicialização. Esse bloqueio inicial
 é independente do intervalo de 30 segundos aplicado depois de um desligamento
 por sobrecarga.
@@ -70,6 +73,7 @@ programa também envia uma mensagem de atividade pela porta serial.
 |---|---:|---|
 | Sinal condicionado do SCT-13 | GPIO 34 | Entrada analógica |
 | Módulo relé | GPIO 26 | Saída digital ativa em nível baixo |
+| Buzzer ativo | GPIO 27 | Alarme de desligamento por sobrecarga |
 | OLED SSD1306 | Barramento I²C | Exibição das medições |
 
 ## Bibliotecas
