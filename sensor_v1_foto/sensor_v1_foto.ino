@@ -16,10 +16,16 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 static const unsigned char PROGMEM logo_bmp[] ={ 0b00000000, 0b11000000,  0b00000001, 0b11000000,  0b00000001, 0b11000000,  0b00000011, 0b11100000,  0b11110011, 0b11100000,  0b11111110, 0b11111000,  0b01111110, 0b11111111, 0b00110011, 0b10011111,  0b00011111, 0b11111100,  0b00001101, 0b01110000,  0b00011011, 0b10100000,  0b00111111, 0b11100000,  0b00111111, 0b11110000,  0b01111100, 0b11110000,  0b01110000, 0b01110000,  0b00000000, 0b00110000 };
 
 const int pinoADC = 34;
+const unsigned long taxaAmostragemHz = 2000UL;
+const unsigned long periodoAmostragemUs = 1000000UL / taxaAmostragemHz;
+// 200 ms correspondem a 12 ciclos completos de uma rede de 60 Hz.
+const int numeroAmostrasRms = 400;
 const int sctval = 10;
-const int tensaoResidencia = 127;
-const float aFx = 13.6436;
-const float bFx = 4.4319;
+const int tensaoResidencia = 120;
+// Ajuste linear obtido a partir dos dados simulados do novo condicionador.
+// A tensao usada aqui e o RMS da componente AC, depois da remocao do offset.
+const float aFx = 35.5249;
+const float bFx = 0.0848;
 const float deadZone = 5.9; // Menos que isso ainda não é possível ler.
 int ct = 0;
 // Caso use ADC_11db entao 3.3
@@ -52,8 +58,8 @@ void setup() {
 
   Serial.begin(115200);
   analogReadResolution(12); // 0-4095
-  //analogSetAttenuation(ADC_11db); // permite medir até ~3.3V
-  analogSetAttenuation(ADC_6db); // permite medir até ~1.9V
+  analogSetAttenuation(ADC_11db); // permite medir até ~3.3V
+  // analogSetAttenuation(ADC_6db); // permite medir até ~1.9V
   Serial.begin(9600);
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
@@ -67,12 +73,7 @@ void setup() {
 }
 
 void loop() {
-  // Leitura usando analogRead
-  // int leitura = analogRead(pinoADC);
-  // float tensao = (leitura / 4095.0) * atenuacao;  // Vadc
-  // Leitura usando analogReadMilliVolts
-  int leitura = analogReadMilliVolts(pinoADC);
-  float tensao = leitura / 1000.0; // Vadc
+  float tensao = medirTensaoRms();
   float corrente = tensao * aFx + bFx;
   float potencia = corrente * tensaoResidencia;
   if (corrente < deadZone)
@@ -86,6 +87,33 @@ void loop() {
   Serial.println("Enviando dados pela serial...");
 
   delay(500);
+}
+
+float medirTensaoRms() {
+  double mediaMv = 0.0;
+  double somaDesviosQuadrados = 0.0;
+  unsigned long proximaAmostra = micros();
+
+  for (int i = 0; i < numeroAmostrasRms; i++) {
+    // Agenda cada conversao a partir do instante inicial. Assim, o tempo gasto
+    // em analogReadMilliVolts() nao e somado ao periodo de 500 us.
+    long tempoRestante = (long)(proximaAmostra - micros());
+    if (tempoRestante > 0) {
+      delayMicroseconds((unsigned int)tempoRestante);
+    }
+    proximaAmostra += periodoAmostragemUs;
+
+    double amostraMv = analogReadMilliVolts(pinoADC);
+
+    // Algoritmo de Welford: calcula a variancia sem armazenar as 400 amostras.
+    // A media representa o offset DC e e removida do resultado RMS.
+    double delta = amostraMv - mediaMv;
+    mediaMv += delta / (i + 1);
+    double delta2 = amostraMv - mediaMv;
+    somaDesviosQuadrados += delta * delta2;
+  }
+
+  return sqrt(somaDesviosQuadrados / numeroAmostrasRms) / 1000.0;
 }
 
 void controlarRele(float potencia) {

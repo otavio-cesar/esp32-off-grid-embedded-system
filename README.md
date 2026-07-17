@@ -7,12 +7,20 @@ estimada da carga.
 ## Funcionamento
 
 O sinal analógico condicionado do sensor é lido pelo **GPIO 34** por meio do ADC
-do ESP32. A tensão medida é convertida em corrente usando a função de primeiro
+do ESP32. O sinal senoidal ocupa aproximadamente a faixa de 0 a 3 V e tem um
+offset próximo de 1,5 V. O firmware coleta 400 amostras a 2 kHz durante 200 ms
+(12 ciclos completos de 60 Hz), calcula o offset pela média das amostras e o
+remove antes de calcular a tensão RMS da componente alternada. A tensão RMS é
+convertida em corrente usando a função de primeiro
 grau obtida na calibração:
 
 ```text
-corrente (A) = 13,6436 × tensão do ADC (V) + 4,4319
+corrente RMS (A) = 35,5249 × tensão AC RMS do ADC (V) + 0,0848
 ```
+
+Esse ajuste foi obtido por regressão linear dos dados simulados do novo
+condicionador, depois de retirar em quadratura o offset de 1,5 V da tensão RMS
+total. O coeficiente de determinação do ajuste é aproximadamente `R² = 0,9996`.
 
 Valores de corrente inferiores a **5,9 A** são considerados parte da zona morta
 da medição e, nesse caso, a corrente e a potência são definidas como zero.
@@ -55,7 +63,8 @@ Um display OLED SSD1306 de **128 × 64 pixels**, no endereço I²C `0x3C`, mostr
 2. corrente calculada, em amperes;
 3. potência estimada, em watts.
 
-As medições e o controle são atualizados aproximadamente a cada 600 ms. O
+Cada janela de medição RMS dura 200 ms. Depois da atualização do display, o
+laço aguarda 500 ms antes de iniciar uma nova janela. O
 programa também envia uma mensagem de atividade pela porta serial.
 
 ## Ligações principais
