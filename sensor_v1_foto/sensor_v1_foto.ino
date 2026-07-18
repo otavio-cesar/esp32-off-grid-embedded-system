@@ -30,14 +30,18 @@ const unsigned long tempoConfirmacaoPico = 2000UL;
 const unsigned long tempoConfirmacaoLigamento = 5000UL;
 const unsigned long tempoMinimoDesligado = 30000UL;
 const unsigned long tempoEsperaInicial = 60000UL;
+const unsigned long duracaoBip = 500UL;
 
 bool releLigado = false;
 bool releFoiDesligado = false;
 bool esperaInicialConcluida = false;
+bool potenciaAcimaLimiteAnterior = false;
+bool buzzerLigado = false;
 unsigned long inicioSobrecarga = 0;
 unsigned long inicioPico = 0;
 unsigned long inicioCondicaoLigar = 0;
 unsigned long momentoDesligamentoRele = 0;
+unsigned long inicioBip = 0;
 
 void setup() {
   pinMode(RELE1, OUTPUT);
@@ -45,6 +49,9 @@ void setup() {
   // Mantem o rele desligado durante a inicializacao.
   digitalWrite(RELE1, HIGH);
   digitalWrite(BUZZER, LOW);
+
+  iniciarBip();
+  aguardarAtualizandoBuzzer(duracaoBip);
 
   Serial.begin(115200);
   analogReadResolution(12);
@@ -80,9 +87,10 @@ void loop() {
   displayLED(vpp, vrms, vmin, vmax, corrente, potencia);
 
   controlarRele(potencia);
+  verificarBuzzer(potencia);
   Serial.println("Enviando dados pela serial...");
 
-  delay(500);
+  aguardarAtualizandoBuzzer(500UL);
 }
 
 void medirExtremosTensao(float &vmin, float &vmax) {
@@ -149,7 +157,6 @@ void controlarRele(float potencia) {
     if (deveDesligar) {
       releLigado = false;
       digitalWrite(RELE1, HIGH);
-      digitalWrite(BUZZER, HIGH);
 
       momentoDesligamentoRele = agora;
       releFoiDesligado = true;
@@ -199,10 +206,43 @@ void controlarRele(float potencia) {
 
   releLigado = true;
   digitalWrite(RELE1, LOW);
-  digitalWrite(BUZZER, LOW);
   inicioCondicaoLigar = 0;
 
   Serial.println("Relé acionado.");
+}
+
+void verificarBuzzer(float potencia) {
+  bool potenciaAcimaLimite = potencia > potenciaLigar;
+
+  if (potenciaAcimaLimite && !potenciaAcimaLimiteAnterior) {
+    iniciarBip();
+  }
+
+  potenciaAcimaLimiteAnterior = potenciaAcimaLimite;
+}
+
+void iniciarBip() {
+  digitalWrite(BUZZER, HIGH);
+  buzzerLigado = true;
+  inicioBip = millis();
+}
+
+void atualizarBuzzer() {
+  if (buzzerLigado && millis() - inicioBip >= duracaoBip) {
+    digitalWrite(BUZZER, LOW);
+    buzzerLigado = false;
+  }
+}
+
+void aguardarAtualizandoBuzzer(unsigned long tempoEspera) {
+  unsigned long inicioEspera = millis();
+
+  while (millis() - inicioEspera < tempoEspera) {
+    atualizarBuzzer();
+    delay(1);
+  }
+
+  atualizarBuzzer();
 }
 
 void displayLED(float vpp, float vrms, float vmin, float vmax,
