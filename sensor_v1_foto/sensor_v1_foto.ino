@@ -13,6 +13,9 @@ const int pinoADC = 34;
 const unsigned long taxaAmostragemHz = 2000UL;
 const unsigned long periodoAmostragemUs = 1000000UL / taxaAmostragemHz;
 const int numeroAmostras = 400;
+const float coeficienteA = 20.453f;
+const float coeficienteB = -0.7362f;
+const float raizDeDois = 1.41421356f;
 
 void setup() {
   Serial.begin(115200);
@@ -38,7 +41,11 @@ void loop() {
   medirExtremosTensao(vmin, vmax);
 
   float vpp = vmax - vmin;
-  mostrarMedicao(vpp, vmin, vmax);
+  float vp = vpp / 2.0f;
+  float vrms = vp / raizDeDois;
+  float corrente = coeficienteA * vrms + coeficienteB;
+
+  mostrarMedicao(vpp, vmin, vmax, corrente);
 }
 
 void medirExtremosTensao(float &vmin, float &vmax) {
@@ -68,7 +75,7 @@ void medirExtremosTensao(float &vmin, float &vmax) {
   vmax = maximoMv / 1000.0f;
 }
 
-void mostrarMedicao(float vpp, float vmin, float vmax) {
+void mostrarMedicao(float vpp, float vmin, float vmax, float corrente) {
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SSD1306_WHITE);
@@ -78,15 +85,20 @@ void mostrarMedicao(float vpp, float vmin, float vmax) {
   display.print(vpp, 2);
   display.println("V");
 
-  display.setCursor(0, 22);
+  display.setCursor(0, 16);
   display.print("Vmin ");
   display.print(vmin, 2);
   display.println("V");
 
-  display.setCursor(0, 44);
+  display.setCursor(0, 32);
   display.print("Vmax ");
   display.print(vmax, 2);
   display.println("V");
+
+  display.setCursor(0, 48);
+  display.print("I ");
+  display.print(corrente, 2);
+  display.println("A");
 
   display.display();
 }
