@@ -15,17 +15,16 @@ const unsigned long periodoAmostragemUs = 1000000UL / taxaAmostragemHz;
 // 200 ms correspondem a 12 ciclos completos de uma rede de 60 Hz.
 const int numeroAmostras = 400;
 const int tensaoResidencia = 120;
-const float coeficienteA = 20.453f;
-const float coeficienteB = -0.7362f;
+const float coeficienteA = 9.295629481419246f;
+const float coeficienteB = -0.178376044032725f;
 
 #define RELE1 26
 #define BUZZER 27
 
 const float potenciaLigar = 1000.0;
 const float potenciaSobrecarga = 1200.0;
-const float potenciaPico = 1450.0;
-const unsigned long tempoConfirmacaoSobrecarga = 10000UL;
-const unsigned long tempoConfirmacaoPico = 2000UL;
+const unsigned long tempoConfirmacaoSobrecarga = 2000UL;
+const unsigned long tempoConfirmacaoPico = 1000UL;
 const unsigned long tempoConfirmacaoLigamento = 5000UL;
 const unsigned long tempoMinimoDesligado = 30000UL;
 const unsigned long tempoEsperaInicial = 60000UL;
@@ -34,7 +33,6 @@ const unsigned long duracaoBip = 500UL;
 bool releLigado = false;
 bool releFoiDesligado = false;
 bool esperaInicialConcluida = false;
-bool potenciaAcimaLimiteAnterior = false;
 bool buzzerLigado = false;
 unsigned long inicioSobrecarga = 0;
 unsigned long inicioPico = 0;
@@ -70,12 +68,8 @@ void setup() {
 }
 
 void loop() {
-  float vmin;
-  float vmax;
+  float vrms = medirTensaoRms();
 
-  float vrms = medirTensaoRms(vmin, vmax);
-
-  float vpp = vmax - vmin;
   float corrente = coeficienteA * vrms + coeficienteB;
 
   if (corrente < 0.0f) {
@@ -83,7 +77,7 @@ void loop() {
   }
 
   float potencia = corrente * tensaoResidencia;
-  displayLED(vpp, vrms, vmin, vmax, corrente, potencia);
+  displayLED(vrms, corrente, potencia);
 
   controlarRele(potencia);
   verificarBuzzer(potencia);
@@ -92,11 +86,9 @@ void loop() {
   aguardarAtualizandoBuzzer(500UL);
 }
 
-float medirTensaoRms(float &vmin, float &vmax) {
+float medirTensaoRms() {
   double mediaMv = 0.0;
   double somaDesviosQuadrados = 0.0;
-  uint32_t minimoMv = 0;
-  uint32_t maximoMv = 0;
   unsigned long proximaAmostra = micros();
 
   for (int i = 0; i < numeroAmostras; i++) {
@@ -108,14 +100,6 @@ float medirTensaoRms(float &vmin, float &vmax) {
 
     uint32_t amostraMv = analogReadMilliVolts(pinoADC);
 
-    if (i == 0 || amostraMv < minimoMv) {
-      minimoMv = amostraMv;
-    }
-
-    if (i == 0 || amostraMv > maximoMv) {
-      maximoMv = amostraMv;
-    }
-
     // Algoritmo de Welford: calcula o RMS da componente alternada usando
     // todas as amostras. A media representa o bias DC e e removida.
     double delta = (double)amostraMv - mediaMv;
@@ -123,9 +107,6 @@ float medirTensaoRms(float &vmin, float &vmax) {
     double delta2 = (double)amostraMv - mediaMv;
     somaDesviosQuadrados += delta * delta2;
   }
-
-  vmin = minimoMv / 1000.0f;
-  vmax = maximoMv / 1000.0f;
 
   return sqrt(somaDesviosQuadrados / numeroAmostras) / 1000.0;
 }
@@ -137,8 +118,8 @@ void controlarRele(float potencia) {
     bool deveDesligar = false;
     inicioCondicaoLigar = 0;
 
-    // Sobrecarga: desliga apos 10 segundos entre 1200 W e 1450 W.
-    if (potencia >= potenciaSobrecarga && potencia <= potenciaPico) {
+    // Sobrecarga: desliga apos 2 segundos continuos a partir de 1000 W.
+    if (potencia >= potenciaLigar) {
       if (inicioSobrecarga == 0) {
         inicioSobrecarga = agora;
       }
@@ -150,8 +131,8 @@ void controlarRele(float potencia) {
       inicioSobrecarga = 0;
     }
 
-    // Pico critico: desliga apos 2 segundos acima de 1450 W.
-    if (potencia > potenciaPico) {
+    // Pico: desliga apos 1 segundo continuo acima de 1200 W.
+    if (potencia > potenciaSobrecarga) {
       if (inicioPico == 0) {
         inicioPico = agora;
       }
@@ -163,7 +144,6 @@ void controlarRele(float potencia) {
       inicioPico = 0;
     }
 
-    // O bloqueio de 30 segundos nunca atrasa um desligamento.
     if (deveDesligar) {
       releLigado = false;
       digitalWrite(RELE1, HIGH);
@@ -173,6 +153,7 @@ void controlarRele(float potencia) {
       inicioSobrecarga = 0;
       inicioPico = 0;
 
+      iniciarBip();
       Serial.println("Relé desativado por sobrecarga.");
     }
 
@@ -222,13 +203,8 @@ void controlarRele(float potencia) {
 }
 
 void verificarBuzzer(float potencia) {
-  bool potenciaAcimaLimite = potencia > potenciaLigar;
-
-  if (potenciaAcimaLimite && !potenciaAcimaLimiteAnterior) {
-    iniciarBip();
-  }
-
-  potenciaAcimaLimiteAnterior = potenciaAcimaLimite;
+  (void)potencia;
+  atualizarBuzzer();
 }
 
 void iniciarBip() {
@@ -255,46 +231,30 @@ void aguardarAtualizandoBuzzer(unsigned long tempoEspera) {
   atualizarBuzzer();
 }
 
-void displayLED(float vpp, float vrms, float vmin, float vmax,
-                float corrente, float potencia) {
+void displayLED(float vrms, float corrente, float potencia) {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
 
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.print("Vpp ");
-  display.print(vpp, 2);
-  display.print("V");
-
-  display.setCursor(0, 10);
-  display.print("RMS ");
+  display.print("Vrms ");
   display.print(vrms, 2);
   display.print("V");
 
-  display.setCursor(0, 20);
-  display.print("Min ");
-  display.print(vmin, 2);
-  display.print("V");
-
-  display.setCursor(0, 30);
-  display.print("Max ");
-  display.print(vmax, 2);
-  display.print("V");
-
   display.setTextSize(1);
-  display.setCursor(0, 45);
+  display.setCursor(0, 25);
   display.print("Corrente A");
 
   display.setTextSize(2);
-  display.setCursor(0, 55);
+  display.setCursor(0, 35);
   display.print(corrente, 2);
 
   display.setTextSize(1);
-  display.setCursor(0, 80);
+  display.setCursor(0, 60);
   display.print("Potencia W");
 
   display.setTextSize(2);
-  display.setCursor(0, 90);
+  display.setCursor(0, 70);
   display.print(potencia, 0);
 
   display.display();
