@@ -1,8 +1,8 @@
 # Monitor de corrente e controle de relé com ESP32
 
 Este projeto utiliza um ESP32 para medir a corrente por meio de um sinal
-senoidal condicionado, estimar a potência da carga e controlar um relé de
-acordo com limites de proteção.
+condicionado, estimar a potência da carga e controlar um relé de acordo com
+limites de proteção.
 
 ## Medição do sinal
 
@@ -14,20 +14,26 @@ O firmware coleta **400 amostras a 2 kHz**, com intervalo de 500 microssegundos
 entre elas. Cada janela de medição dura aproximadamente 200 ms, o equivalente
 a cerca de 12 ciclos de uma onda de 60 Hz.
 
-Durante cada janela, o programa encontra a menor e a maior tensão medidas e
-calcula a tensão pico a pico:
+Durante cada janela, o programa calcula a média das amostras para identificar o
+bias DC. Em seguida, remove esse bias e calcula o RMS da componente alternada
+usando todas as amostras:
+
+```text
+Vrms = sqrt(soma((amostra - média)²) / número de amostras)
+```
+
+O cálculo é feito de forma incremental pelo algoritmo de Welford, sem precisar
+armazenar as 400 amostras. Dessa forma, o resultado não depende da hipótese de
+uma onda perfeitamente senoidal e é menos sensível a picos isolados.
+
+Os valores mínimo e máximo também são coletados para exibição e diagnóstico. A
+tensão pico a pico é calculada por:
 
 ```text
 Vpp = Vmax - Vmin
 ```
 
-A tensão pico a pico é convertida em tensão de pico e depois em tensão RMS,
-considerando uma onda senoidal:
-
-```text
-Vp   = Vpp / 2
-Vrms = Vp / sqrt(2)
-```
+O `Vpp` não é usado no cálculo da corrente.
 
 ## Cálculo da corrente e da potência
 
@@ -79,8 +85,9 @@ aproximadamente 65 segundos após a inicialização.
 
 ## Display
 
-Um display OLED SSD1306 de **128 x 64 pixels**, no endereço I2C `0x3C`, mostra
-as seguintes medições:
+Um display OLED SSD1306 de **128 x 64 pixels**, no endereço I2C `0x3C`, tem a
+interface girada 90 graus no sentido horário, resultando em uma área lógica de
+64 x 128 pixels. Ele mostra as seguintes medições:
 
 - em texto menor: `Vpp`, `Vrms`, `Vmin` e `Vmax`;
 - em texto maior: corrente (`I`) e potência (`P`).

@@ -17,7 +17,6 @@ const int numeroAmostras = 400;
 const int tensaoResidencia = 120;
 const float coeficienteA = 20.453f;
 const float coeficienteB = -0.7362f;
-const float raizDeDois = 1.41421356f;
 
 #define RELE1 26
 #define BUZZER 27
@@ -64,6 +63,8 @@ void setup() {
     }
   }
 
+  // Gira a interface 90 graus no sentido horario (formato 64 x 128).
+  display.setRotation(1);
   display.clearDisplay();
   display.display();
 }
@@ -72,11 +73,9 @@ void loop() {
   float vmin;
   float vmax;
 
-  medirExtremosTensao(vmin, vmax);
+  float vrms = medirTensaoRms(vmin, vmax);
 
   float vpp = vmax - vmin;
-  float vp = vpp / 2.0f;
-  float vrms = vp / raizDeDois;
   float corrente = coeficienteA * vrms + coeficienteB;
 
   if (corrente < 0.0f) {
@@ -93,7 +92,9 @@ void loop() {
   aguardarAtualizandoBuzzer(500UL);
 }
 
-void medirExtremosTensao(float &vmin, float &vmax) {
+float medirTensaoRms(float &vmin, float &vmax) {
+  double mediaMv = 0.0;
+  double somaDesviosQuadrados = 0.0;
   uint32_t minimoMv = 0;
   uint32_t maximoMv = 0;
   unsigned long proximaAmostra = micros();
@@ -114,10 +115,19 @@ void medirExtremosTensao(float &vmin, float &vmax) {
     if (i == 0 || amostraMv > maximoMv) {
       maximoMv = amostraMv;
     }
+
+    // Algoritmo de Welford: calcula o RMS da componente alternada usando
+    // todas as amostras. A media representa o bias DC e e removida.
+    double delta = (double)amostraMv - mediaMv;
+    mediaMv += delta / (i + 1);
+    double delta2 = (double)amostraMv - mediaMv;
+    somaDesviosQuadrados += delta * delta2;
   }
 
   vmin = minimoMv / 1000.0f;
   vmax = maximoMv / 1000.0f;
+
+  return sqrt(somaDesviosQuadrados / numeroAmostras) / 1000.0;
 }
 
 void controlarRele(float potencia) {
@@ -254,25 +264,38 @@ void displayLED(float vpp, float vrms, float vmin, float vmax,
   display.setCursor(0, 0);
   display.print("Vpp ");
   display.print(vpp, 2);
-  display.print(" Vrms ");
-  display.print(vrms, 2);
+  display.print("V");
 
-  display.setCursor(0, 9);
+  display.setCursor(0, 10);
+  display.print("RMS ");
+  display.print(vrms, 2);
+  display.print("V");
+
+  display.setCursor(0, 20);
   display.print("Min ");
   display.print(vmin, 2);
-  display.print(" Max ");
+  display.print("V");
+
+  display.setCursor(0, 30);
+  display.print("Max ");
   display.print(vmax, 2);
+  display.print("V");
+
+  display.setTextSize(1);
+  display.setCursor(0, 45);
+  display.print("Corrente A");
 
   display.setTextSize(2);
-  display.setCursor(0, 21);
-  display.print("I ");
-  display.print(corrente);
-  display.print(" A");
+  display.setCursor(0, 55);
+  display.print(corrente, 2);
 
-  display.setCursor(0, 43);
-  display.print("P ");
+  display.setTextSize(1);
+  display.setCursor(0, 80);
+  display.print("Potencia W");
+
+  display.setTextSize(2);
+  display.setCursor(0, 90);
   display.print(potencia, 0);
-  display.print(" W");
 
   display.display();
 }
